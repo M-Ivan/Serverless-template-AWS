@@ -13,7 +13,7 @@ export default async (body: Record<string, unknown>): Promise<OperationInterface
       error: {
         status: HttpStatusCode.InternalServerError,
         message: e.message,
-        code: 'example_error',
+        name: 'example_error',
       },
     };
   }

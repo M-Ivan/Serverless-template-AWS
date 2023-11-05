@@ -2,6 +2,7 @@ import { Logger } from '@aws-lambda-powertools/logger';
 import { PutObjectCommandInput, PutObjectOutput, S3, S3ClientConfig } from '@aws-sdk/client-s3';
 
 import { OperationInterface } from '@/common/interface/operation.interface';
+import { getAWSCredentials } from '@/common/helpers/aws.helpers';
 
 export default class S3Service {
   private readonly logger: Logger;
@@ -34,16 +35,7 @@ export default class S3Service {
   }
 
   private configureClient(): S3ClientConfig {
-    let credentials: { accessKeyId: string; secretAccessKey: string };
-
-    // Set authentication only if there are given credentials
-    // (local dev only)
-    if (process.env.AWS_ACCESS_KEY && process.env.AWS_SECRET_KEY) {
-      credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY,
-        secretAccessKey: process.env.AWS_SECRET_KEY,
-      };
-    }
+    const credentials = getAWSCredentials();
 
     const s3Config: S3ClientConfig = {
       endpoint: `https://s3.${process.env.AWS_REGION}.amazonaws.com`,

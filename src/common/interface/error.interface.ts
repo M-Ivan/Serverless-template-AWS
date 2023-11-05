@@ -1,7 +1,7 @@
 import { HttpStatusCode } from 'axios';
 
 export interface ErrorInterface {
-  code: string;
+  name: string;
   message: string;
   status: HttpStatusCode;
 }

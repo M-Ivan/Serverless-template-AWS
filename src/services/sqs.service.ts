@@ -1,7 +1,8 @@
 import { Logger } from '@aws-lambda-powertools/logger';
-import { AWSError, Credentials, SQS } from 'aws-sdk';
 
 import { OperationInterface } from '@/common/interface/operation.interface';
+import { getAWSCredentials } from '@/common/helpers/aws.helpers';
+import { SQS, SQSClientConfig, SendMessageCommandInput, SendMessageResult } from '@aws-sdk/client-sqs';
 
 export default class SQSService {
   private readonly logger: Logger;
@@ -12,18 +13,18 @@ export default class SQSService {
   async publishMessage(
     queueUrl: string,
     payload: Record<string, unknown>,
-  ): Promise<OperationInterface<SQS.SendMessageResult, AWSError>> {
+  ): Promise<OperationInterface<SendMessageResult>> {
     try {
       const config = this.configureClient(queueUrl);
 
       const sqs = new SQS(config);
 
-      const params: SQS.SendMessageRequest = {
+      const params: SendMessageCommandInput = {
         MessageBody: JSON.stringify(payload),
         QueueUrl: queueUrl,
       };
 
-      const response = await sqs.sendMessage(params).promise();
+      const response = await sqs.sendMessage(params);
       return { ok: true, result: response };
     } catch (e) {
       this.logger.error(e);
@@ -32,27 +33,11 @@ export default class SQSService {
     }
   }
 
-  /**
-   * @method configureSqsClient
-   * Configures the SQS client with the necessary credentials and region
-   * @param {string} queueUrl the url of the queue to configure the client for
-   * @returns {SQS.ClientConfiguration} the SQS client configuration
-   * */
-  private configureClient(queueUrl: string): SQS.ClientConfiguration {
-    let credentials: Credentials;
+  private configureClient(queueUrl: string): SQSClientConfig {
+    const credentials = getAWSCredentials();
 
-    // Set authentication only if there are given credentials
-    // (local dev only)
-    if (process.env.AWS_ACCESS_KEY && process.env.AWS_SECRET_KEY) {
-      credentials = new Credentials({
-        accessKeyId: process.env.AWS_ACCESS_KEY,
-        secretAccessKey: process.env.AWS_SECRET_KEY,
-      });
-    }
-
-    const sqsConfig: SQS.ClientConfiguration = {
+    const sqsConfig: SQSClientConfig = {
       endpoint: queueUrl,
-      // Only attach credentials if they are defined
       ...(credentials && { credentials }),
       region: process.env.AWS_REGION,
     };

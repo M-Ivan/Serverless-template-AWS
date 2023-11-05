@@ -1,7 +1,15 @@
+import { getAWSCredentials } from '@/common/helpers/aws.helpers';
 import { OperationInterface } from '@/common/interface/operation.interface';
+import { Logger } from '@aws-lambda-powertools/logger';
 import { AttributeValue, DynamoDB, DynamoDBClientConfig, PutItemCommandOutput } from '@aws-sdk/client-dynamodb';
 
 export class DynamoDBClient {
+  private readonly logger: Logger;
+
+  constructor() {
+    this.logger = new Logger({ serviceName: `DynamoDB-client` });
+  }
+
   async put<T>(tableName: string, item: T[]): Promise<OperationInterface<PutItemCommandOutput>> {
     try {
       const DDBClient = new DynamoDB(this.configureClient());
@@ -15,7 +23,7 @@ export class DynamoDBClient {
 
       return { ok: true, result };
     } catch (e) {
-      console.error(`AWS/DynamoDB/put`, e);
+      this.logger.error(e);
       throw e;
     }
   }
@@ -62,22 +70,13 @@ export class DynamoDBClient {
       const result = await DDBClient.query(requestParams);
       return result.Items as T[];
     } catch (e) {
-      console.error(`AWS/DynamoDB/query`, e);
+      this.logger.error(e);
       throw e;
     }
   }
 
   private configureClient(): DynamoDBClientConfig {
-    let credentials;
-
-    // Set authentication only if there are given credentials
-    // (local dev only)
-    if (process.env.AWS_ACCESS_KEY && process.env.AWS_SECRET_KEY) {
-      credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY,
-        secretAccessKey: process.env.AWS_SECRET_KEY,
-      };
-    }
+    const credentials = getAWSCredentials();
 
     const DDBConfig: DynamoDBClientConfig = {
       endpoint: `https://dynamodb.${process.env.AWS_REGION}.amazonaws.com`,
