@@ -1,0 +1,32 @@
+service: 'Serverless'
+plugins:
+  - serverless-auto-swagger
+  - serverless-esbuild
+  - serverless-offline
+  - serverless-dotenv-plugin
+
+package:
+  individually: true
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+
+custom:
+  autoswagger:
+    title: 'AWS Serverless template'
+  description: 'API Documentation for AWS Serverless template'
+
+functions:
+  ExampleFunction:
+    handler: src/index.handler
+    events:
+      - http:
+          method: POST
+          path: /example-function
+          swaggerTags: ['Example']
+          summary: 'Example path'
+          bodyType: 'ExportManifestInput'
+          description: 'Example endpoint description'
+          responseData: { 200: { description: 'Success' } }
