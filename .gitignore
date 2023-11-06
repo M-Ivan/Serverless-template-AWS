@@ -133,5 +133,5 @@ dist
 swagger
 .esbuild/
 .esbuild
-.esbuild/src/index.js
+.esbuild/.build/src/index.js
 .esbuild/src
