@@ -1,8 +1,8 @@
 import { Logger } from '@aws-lambda-powertools/logger';
 
 import { OperationInterface } from '@/common/interface/operation.interface';
-import { getAWSCredentials } from '@/common/helpers/aws.helpers';
 import { SQS, SQSClientConfig, SendMessageCommandInput, SendMessageResult } from '@aws-sdk/client-sqs';
+import { getAwsCredentials } from '@/common/helpers/aws.helpers';
 
 export default class SQSService {
   private readonly logger: Logger;
@@ -34,7 +34,7 @@ export default class SQSService {
   }
 
   private configureClient(queueUrl: string): SQSClientConfig {
-    const credentials = getAWSCredentials();
+    const credentials = getAwsCredentials();
 
     const sqsConfig: SQSClientConfig = {
       endpoint: queueUrl,

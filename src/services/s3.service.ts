@@ -1,8 +1,7 @@
 import { Logger } from '@aws-lambda-powertools/logger';
 import { PutObjectCommandInput, PutObjectOutput, S3, S3ClientConfig } from '@aws-sdk/client-s3';
-
 import { OperationInterface } from '@/common/interface/operation.interface';
-import { getAWSCredentials } from '@/common/helpers/aws.helpers';
+import { getAwsCredentials } from '@/common/helpers/aws.helpers';
 
 export default class S3Service {
   private readonly logger: Logger;
@@ -35,7 +34,7 @@ export default class S3Service {
   }
 
   private configureClient(): S3ClientConfig {
-    const credentials = getAWSCredentials();
+    const credentials = getAwsCredentials();
 
     const s3Config: S3ClientConfig = {
       endpoint: `https://s3.${process.env.AWS_REGION}.amazonaws.com`,

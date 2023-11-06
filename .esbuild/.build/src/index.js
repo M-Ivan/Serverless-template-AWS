@@ -16204,25 +16204,14 @@ var version = "1.0.0";
 
 // src/functions/example.handler.ts
 var example_handler_default = async (body) => {
-  try {
-    return {
-      ok: true,
-      result: {}
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      error: {
-        status: HttpStatusCode2.InternalServerError,
-        message: e.message,
-        code: "example_error"
-      }
-    };
-  }
+  return {
+    ok: true,
+    result: {}
+  };
 };
 
 // src/index.ts
-var logger = new import_logger.Logger({ serviceName: "reports-uploader/handler" });
+var logger = new import_logger.Logger({ serviceName: "main/handler" });
 var handler = async (_event) => {
   const body = _event.body ? JSON.parse(_event.body) : {};
   const path = _event.path.split("/").pop();

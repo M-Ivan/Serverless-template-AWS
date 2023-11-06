@@ -6,7 +6,7 @@ import { version } from '@/../package.json';
 import { PathsEnum } from './common/enum/paths.enum';
 import exampleHandler from './functions/example.handler';
 
-const logger = new Logger({ serviceName: 'reports-uploader/handler' });
+const logger = new Logger({ serviceName: 'main/handler' });
 
 export const handler = async (_event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const body = _event.body ? JSON.parse(_event.body) : {};

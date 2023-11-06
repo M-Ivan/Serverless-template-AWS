@@ -1,90 +1,147 @@
-import { getAWSCredentials } from '@/common/helpers/aws.helpers';
+import { getAwsCredentials } from '@/common/helpers/aws.helpers';
 import { OperationInterface } from '@/common/interface/operation.interface';
 import { Logger } from '@aws-lambda-powertools/logger';
-import { AttributeValue, DynamoDB, DynamoDBClientConfig, PutItemCommandOutput } from '@aws-sdk/client-dynamodb';
+import { AttributeValue, DynamoDB, DynamoDBClientConfig, PutItemCommandInput } from '@aws-sdk/client-dynamodb';
+import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 
-export class DynamoDBClient {
+export interface ItemPrimaryKey<T> {
+  primary: AttributeValueInterface<T>;
+  sort?: AttributeValueInterface<T>;
+}
+
+export interface AttributeValueInterface<T> {
+  attribute: keyof T;
+  value: unknown;
+}
+
+export class DynamoDBService {
   private readonly logger: Logger;
 
   constructor() {
     this.logger = new Logger({ serviceName: `DynamoDB-client` });
   }
 
-  async put<T>(tableName: string, item: T[]): Promise<OperationInterface<PutItemCommandOutput>> {
+  async insert<T>(tableName: string, item: T, pk: ItemPrimaryKey<T>): Promise<OperationInterface<T>> {
     try {
       const DDBClient = new DynamoDB(this.configureClient());
 
-      const params = {
+      const conditionExpression =
+        `attribute_not_exists(${pk.primary.attribute.toString()})` +
+        (pk.sort ? ` AND attribute_not_exists(${pk.sort.attribute.toString()})` : '');
+
+      const params: PutItemCommandInput = {
         TableName: tableName,
-        Item: item as unknown as Record<string, AttributeValue>,
+        Item: this.mapToDynamoDB(item),
+        ConditionExpression: conditionExpression,
       };
 
-      const result = await DDBClient.putItem(params);
+      await DDBClient.putItem(params);
 
-      return { ok: true, result };
+      return { ok: true, result: item };
     } catch (e) {
       this.logger.error(e);
-      throw e;
+      return { ok: false, error: e };
     }
   }
 
-  async getItem<T>(tableName: string, pk: { property: keyof T; value: unknown }): Promise<OperationInterface<T>> {
+  async update<T>(tableName: string, item: T, pk: ItemPrimaryKey<T>): Promise<OperationInterface<T>> {
     try {
       const DDBClient = new DynamoDB(this.configureClient());
 
-      const params = {
+      const conditionExpression =
+        `attribute_exists(${pk.primary.attribute.toString()})` +
+        (pk.sort ? ` AND attribute_exists(${pk.sort.attribute.toString()})` : '');
+
+      const params: PutItemCommandInput = {
         TableName: tableName,
-        Key: {
-          [pk.property]: { S: pk.value as string },
-        },
+        Item: this.mapToDynamoDB(item),
+        ConditionExpression: conditionExpression,
       };
-      const result = await DDBClient.getItem(params);
-      return { ok: true, result: result.Item as T };
-    } catch (e) {}
+
+      await DDBClient.putItem(params);
+
+      return { ok: true, result: item };
+    } catch (e) {
+      this.logger.error(e);
+      return { ok: false, error: e };
+    }
   }
 
-  async query<T>(tableName: string, params: { property: keyof T; value: unknown }[]): Promise<T[]> {
-    const keyConditionExpression = [];
-    const expressionAttributeValues = {};
+  async findOne<T>(tableName: string, pk: ItemPrimaryKey<T>): Promise<OperationInterface<T>> {
+    try {
+      const DDBClient = new DynamoDB(this.configureClient());
 
+      const pkParam = this.mapToDynamoDB({
+        [pk.primary.attribute]: pk.primary.value,
+        ...(pk.sort && { [pk.sort.attribute]: pk.sort.value }),
+      });
+
+      const params = {
+        TableName: tableName,
+        Key: pkParam,
+      };
+      const result = await DDBClient.getItem(params);
+      return { ok: true, result: this.mapFromDynamoDB(result.Item) };
+    } catch (e) {
+      this.logger.error(e);
+      return { ok: false, error: e };
+    }
+  }
+
+  async find<T>(tableName: string, params: ItemPrimaryKey<T>): Promise<OperationInterface<T[]>> {
     const DDBClient = new DynamoDB(this.configureClient());
 
-    for (let i = 0; i < params.length; i++) {
-      const param = params[i];
-
-      const key = `#property${i}`;
-      const value = `:value${i}`;
-      keyConditionExpression.push(`${key} = ${value}`);
-      expressionAttributeValues[key] = param.property;
-      expressionAttributeValues[value] = param.value;
-    }
+    const conditionExpression =
+      `${params.primary.attribute.toString()} = :primary` +
+      (params.sort ? ` AND ${params.sort.attribute.toString()} = :sort` : '');
 
     const requestParams = {
       TableName: tableName,
-      KeyConditionExpression: keyConditionExpression.join(' AND '),
-      ExpressionAttributeNames: { '#property0': params[0].property.toString() }, // Use the first property as an example
-      ExpressionAttributeValues: expressionAttributeValues,
+      KeyConditionExpression: conditionExpression,
+      ExpressionAttributeValues: this.createFilterExpression(params),
     };
 
     try {
-      const result = await DDBClient.query(requestParams);
-      return result.Items as T[];
+      const response = await DDBClient.query(requestParams);
+
+      const items: T[] = [];
+      for (const item of response.Items) {
+        items.push(this.mapFromDynamoDB(item));
+      }
+
+      return { ok: true, result: items };
     } catch (e) {
       this.logger.error(e);
-      throw e;
+      return { ok: false, error: e };
     }
   }
 
   private configureClient(): DynamoDBClientConfig {
-    const credentials = getAWSCredentials();
+    const credentials = getAwsCredentials();
 
     const DDBConfig: DynamoDBClientConfig = {
       endpoint: `https://dynamodb.${process.env.AWS_REGION}.amazonaws.com`,
-      // Only attach credentials if they are defined
       ...(credentials && { credentials }),
       region: process.env.AWS_REGION,
     };
 
     return DDBConfig;
+  }
+
+  private mapToDynamoDB<T>(item: T): Record<string, AttributeValue> {
+    return marshall(item, { convertEmptyValues: true, removeUndefinedValues: true });
+  }
+
+  private mapFromDynamoDB<T>(item: Record<string, AttributeValue>): T {
+    return unmarshall(item) as T;
+  }
+
+  private createFilterExpression<T>(itemPrimaryKey: ItemPrimaryKey<T>): Record<string, AttributeValue> {
+    const object = {
+      ':primary': itemPrimaryKey.primary.value,
+      ...(itemPrimaryKey.sort && { ':sort': itemPrimaryKey.sort.value }),
+    };
+
+    return this.mapToDynamoDB(object);
   }
 }
